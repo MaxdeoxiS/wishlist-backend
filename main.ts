@@ -1,5 +1,5 @@
 import { Application } from "jsr:@oak/oak/application";
-import ListRouter from "./src/wishlist/routes.ts";
+import ListRouter from "./src/routes.ts";
 
 const app = new Application();
 
