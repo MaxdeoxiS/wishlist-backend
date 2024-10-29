@@ -136,58 +136,55 @@ export async function uploadFile(file: File) {
     }
 }
 
-export async function getWishInfosFromUrl(url: string) {
-    const browser = await launch();
+// export async function getWishInfosFromUrl(url: string) {
+//     const browser = await launch();
 
-    const page = await browser.newPage(url
-        // "https://www.amazon.fr/Asmodee-Play-Punk-Captain-Flip/dp/B0CY63P4PB/?_encoding=UTF8&pd_rd_w=k2OEa&content-id=amzn1.sym.c6c714d0-70b2-4898-816f-f82a0c2b0af5%3Aamzn1.symc.9c69961c-776f-45c4-b797-9eea1239a3fb&pf_rd_p=c6c714d0-70b2-4898-816f-f82a0c2b0af5&pf_rd_r=FY6PS64ZA4WWPH15CYC4&pd_rd_wg=em1Xu&pd_rd_r=19e894be-704f-46cd-bcad-a831b3ff4c02&ref_=pd_hp_d_atf_ci_mcx_mr_ca_hp_atf_d",
-    );
+//     const page = await browser.newPage(url);
 
-    await page.setViewportSize({ width: 400, height: 800 });
+//     await page.setViewportSize({ width: 400, height: 800 });
 
-    // const html = await page.content()
+//     // const html = await page.content()
 
-    // COMMON
-    const title = await page.evaluate(() => document.title)
+//     // COMMON
+//     const title = await page.evaluate(() => document.title)
 
-    //IF AMAZON
-    const price = await page.evaluate(() => {
-        return (document.getElementById("items[0.base][customerVisiblePrice][amount]") as HTMLInputElement | null)?.value
-        //    return  document.querySelector('[class="a-price-whole"]')?.textContent + document.querySelector('[class="a-price-fraction"]')?.textContent
-    })
-    const data = { title, price }
+//     //IF AMAZON
+//     const price = await page.evaluate(() => {
+//         return (document.getElementById("items[0.base][customerVisiblePrice][amount]") as HTMLInputElement | null)?.value
+//     })
+//     const data = { title, price }
 
-    // ELSE
-    // const screenshot = await page.screenshot();
-    // Deno.writeFileSync("screenshot.png", screenshot);
-    // TODO: send screenshot to open ai
-    // Close the browser
-    await browser.close();
+//     // ELSE
+//     // const screenshot = await page.screenshot();
+//     // Deno.writeFileSync("screenshot.png", screenshot);
+//     // TODO: send screenshot to open ai
+//     // Close the browser
+//     await browser.close();
 
-    return data
-}
+//     return data
+// }
 
-export async function getWishInfosFromScreenshot(url: string) {
-    const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-            {
-                role: "user", content: [
-                    {
-                        type: "text", text: "Here is a screenshot of an ecommerce site. Give me a JSON data with two properties: the name of the item, and its price. If you can't find the item nor the price, return an empty json."
-                    },
-                    {
-                        type: "image_url",
-                        image_url: {
-                            url
-                            // "url": "https://image.noelshack.com/fichiers/2024/43/3/1729709559-screenamazontest.png",
-                            // "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
-                        },
-                    }
-                ]
-            },
-        ],
-    });
+// export async function getWishInfosFromScreenshot(url: string) {
+//     const completion = await openai.chat.completions.create({
+//         model: "gpt-4o-mini",
+//         messages: [
+//             {
+//                 role: "user", content: [
+//                     {
+//                         type: "text", text: "Here is a screenshot of an ecommerce site. Give me a JSON data with two properties: the name of the item, and its price. If you can't find the item nor the price, return an empty json."
+//                     },
+//                     {
+//                         type: "image_url",
+//                         image_url: {
+//                             url
+//                             // "url": "https://image.noelshack.com/fichiers/2024/43/3/1729709559-screenamazontest.png",
+//                             // "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+//                         },
+//                     }
+//                 ]
+//             },
+//         ],
+//     });
 
-    return completion
-}
+//     return completion
+// }
