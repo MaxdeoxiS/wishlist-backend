@@ -1,5 +1,5 @@
 import { Router } from "@oak/oak/router";
-import { createList, createWish, getList, getWish, updateWish, uploadFile } from "./services.ts";
+import { createList, createWish, deleteWish, getList, getWish, updateWish, uploadFile } from "./services.ts";
 
 const router = new Router({ prefix: "/list" });
 
@@ -62,6 +62,14 @@ router.put(
         response.body = wish;
     },
 );
+
+router.delete("/:listId/wishes/:wishId", async ({params, response}) => {
+    const { listId, wishId } = params;
+
+    const deleted = await deleteWish(listId, wishId)
+
+    response.body = deleted
+})
 
 router.post("/picture", async ({ request, response }) => {
     const file = (await request.body.formData()).get("file") as File | null;

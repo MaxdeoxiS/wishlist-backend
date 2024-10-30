@@ -90,6 +90,20 @@ export async function updateWish(listId: string, wishId: string, body: {
     return data
 }
 
+export async function deleteWish(listId: string, wishId: string) {
+    const { data, error } = await supabase.from("wishes").delete().eq("listId", listId).eq(
+        "id",
+        wishId,
+    ).select();
+
+    if (error) {
+        console.error(error)
+        return null
+    }
+
+    return data
+}
+
 export async function uploadFile(file: File) {
     const S3_BUCKET = "cmldocuments";
     const REGION = "eu-west-3";
