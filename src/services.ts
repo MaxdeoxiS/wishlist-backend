@@ -2,14 +2,10 @@
 import AWS from "aws-sdk";
 import { supabase } from "../supabase.ts";
 import { randomUUID } from "node:crypto";
-import OpenAI from "openai";
-import { launch } from "jsr:@astral/astral";
-
-const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_SECRET") });
 
 export async function getList(id: string) {
     const { data, error } = await supabase.from("list").select("*, wishes(*)").order(
-        "created_at",
+        "bought_by",
         {
             referencedTable: "wishes",
             ascending: false,
