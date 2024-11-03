@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 import AWS from "aws-sdk";
 import { randomUUID } from "node:crypto";
 import { supabase } from "../supabase.ts";
