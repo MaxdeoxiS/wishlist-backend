@@ -1,9 +1,9 @@
 import { Router } from "@oak/oak/router";
-import { createList, createWish, deleteWish, getList, getWish, updateWish, uploadFile } from "./services.ts";
+import { createList, createWish, deleteWish, getGroup, getList, getWish, updateWish, uploadFile } from "./services.ts";
 
-const router = new Router({ prefix: "/list" });
+const router = new Router();
 
-router.get("/:listId", async ({ params, response }) => {
+router.get("/list/:listId", async ({ params, response }) => {
     const list = await getList(params.listId)
 
     if (!list) {
@@ -12,7 +12,7 @@ router.get("/:listId", async ({ params, response }) => {
     response.body = list;
 });
 
-router.get("/:listId/wishes/:wishId", async ({ params, response }) => {
+router.get("/list/:listId/wishes/:wishId", async ({ params, response }) => {
     const { listId, wishId } = params;
 
     const wish = await getWish(listId, wishId);
@@ -23,10 +23,10 @@ router.get("/:listId/wishes/:wishId", async ({ params, response }) => {
     response.body = wish;
 });
 
-router.post("/", async ({ request, response }) => {
-    const { title, user } = await request.body.json();
+router.post("/list", async ({ request, response }) => {
+    const { title, user, groupId } = await request.body.json();
 
-    const list = await createList({ title, user })
+    const list = await createList({ title, user, groupId })
 
     if (!list) {
         response.status = 500;
@@ -35,7 +35,7 @@ router.post("/", async ({ request, response }) => {
     response.body = list;
 });
 
-router.post("/:listId/wishes", async ({ request, response, params }) => {
+router.post("/list/:listId/wishes", async ({ request, response, params }) => {
     const { url, name, price, comment, picture } = await request.body.json();
     const { listId } = params;
 
@@ -48,7 +48,7 @@ router.post("/:listId/wishes", async ({ request, response, params }) => {
 });
 
 router.put(
-    "/:listId/wishes/:wishId/toggle",
+    "/list/:listId/wishes/:wishId/toggle",
     async ({ params, response, request }) => {
         const { listId, wishId } = params;
         const { bought_by } = await request.body.json();
@@ -63,7 +63,7 @@ router.put(
     },
 );
 
-router.delete("/:listId/wishes/:wishId", async ({params, response}) => {
+router.delete("/list/:listId/wishes/:wishId", async ({params, response}) => {
     const { listId, wishId } = params;
 
     const deleted = await deleteWish(listId, wishId)
@@ -71,7 +71,7 @@ router.delete("/:listId/wishes/:wishId", async ({params, response}) => {
     response.body = deleted
 })
 
-router.post("/picture", async ({ request, response }) => {
+router.post("/list/picture", async ({ request, response }) => {
     const file = (await request.body.formData()).get("file") as File | null;
 
     if (!file) {
@@ -82,6 +82,15 @@ router.post("/picture", async ({ request, response }) => {
     const fileUrl = await uploadFile(file)
 
     response.body = { url: fileUrl }
+})
+
+router.get("/group/:groupId", async ({params, response}) => {
+    const group = await getGroup(params.groupId)
+
+    if (!group) {
+        response.status = 404;
+    }
+    response.body = group; 
 })
 
 router.allowedMethods();

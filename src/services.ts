@@ -1,13 +1,30 @@
 /// <reference lib="dom" />
 import AWS from "aws-sdk";
-import { supabase } from "../supabase.ts";
 import { randomUUID } from "node:crypto";
+import { supabase } from "../supabase.ts";
 
 export async function getList(id: string) {
     const { data, error } = await supabase.from("list").select("*, wishes(*)").order(
         "bought_by",
         {
             referencedTable: "wishes",
+            ascending: false,
+        },
+    ).eq("id", id).maybeSingle();
+
+    if (error) {
+        console.error(error)
+        return null
+    }
+
+    return data;
+}
+
+export async function getGroup(id: string) {
+    const { data, error } = await supabase.from("group").select("*, list(*)").order(
+        "created_at",
+        {
+            referencedTable: "list",
             ascending: false,
         },
     ).eq("id", id).maybeSingle();
@@ -32,10 +49,11 @@ export async function getWish(listId: string, id: string) {
     return wish;
 }
 
-export async function createList({ title, user }: { title: string; user: string }) {
+export async function createList({ title, user, groupId }: { title: string; user: string; groupId?: string; }) {
     const { data, error } = await supabase.from("list").insert({
         user,
         title,
+        groupId,
     }).select("*").single();
 
     if (error) {
