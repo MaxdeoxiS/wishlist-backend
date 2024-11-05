@@ -121,10 +121,7 @@ export async function uploadFile(file: File) {
     const S3_BUCKET = "cmldocuments";
     const REGION = "eu-west-3";
 
-    AWS.config.update({
-        accessKeyId: "youraccesskeyhere",
-        secretAccessKey: "yoursecretaccesskeyhere",
-    });
+    console.log("Initializing upload...");
 
     const s3 = new AWS.S3({
         params: { Bucket: S3_BUCKET },
@@ -136,33 +133,43 @@ export async function uploadFile(file: File) {
     });
 
     if (file) {
-        const fileContent = await file.arrayBuffer();
-        const fileBuffer = new Uint8Array(fileContent);
-        const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
+        try {
+            const fileContent = await file.arrayBuffer();
+            const fileBuffer = new Uint8Array(fileContent);
+            const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
 
-        const params = {
-            Bucket: S3_BUCKET,
-            Key: fileName,
-            Body: fileBuffer,
-            ContentType: file.type,
-        };
+            console.log("File buffer prepared:", fileBuffer.length);
 
-        const upload = s3
-            .putObject(params)
-            .on("httpUploadProgress", (evt) => {
-                console.log(
-                    "Uploading " + (evt.loaded * 100) / evt.total +
-                    "%",
-                );
-            }).promise()
+            const params = {
+                Bucket: S3_BUCKET,
+                Key: fileName,
+                Body: fileBuffer,
+                ContentType: file.type,
+            };
 
-        const res = await upload;
-        if (res) {
-            return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+            const upload = s3
+                .putObject(params)
+                .on("httpUploadProgress", (evt) => {
+                    console.log(`Uploading ${(evt.loaded * 100) / evt.total}%`);
+                })
+                .promise();
+
+            const res = await upload;
+            
+            console.log("Upload complete:", res);
+
+            if (res) {
+                return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+            }
+        } catch (error) {
+            console.error("Error during file upload:", error);
+            throw new Error("Upload failed, please try again.");
         }
+    } else {
+        console.warn("No file provided for upload.");
+        throw new Error("No file to upload.");
     }
 }
-
 // export async function getWishInfosFromUrl(url: string) {
 //     const browser = await launch();
 
