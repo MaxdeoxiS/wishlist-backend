@@ -1,6 +1,7 @@
-import AWS from "aws-sdk";
 import { randomUUID } from "node:crypto";
 import { supabase } from "../supabase.ts";
+import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3";
+
 
 export async function getList(id: string) {
     const { data, error } = await supabase.from("list").select("*, wishes(*)").order(
@@ -121,64 +122,37 @@ export async function uploadFile(file: File) {
     const S3_BUCKET = "cmldocuments";
     const REGION = "eu-west-3";
 
-    const s3 = new AWS.S3({
-        region: REGION,
-        credentials: {
-            accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
-            secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
-        },
-    });
+    if (file) {
+        try {
 
-    const fileContent = await file.arrayBuffer();
-    const fileBuffer = new Uint8Array(fileContent);
-    const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
-    
-    const uploadParams = {
-        Bucket: S3_BUCKET,
-        Key: fileName,
-        ContentType: file.type,
-    };
+            const fileContent = await file.arrayBuffer();
+            const fileBuffer = new Uint8Array(fileContent);
+            const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
 
-    const multipartUpload = await s3.createMultipartUpload(uploadParams).promise();
-    const uploadId = multipartUpload.UploadId;
-    
-    try {
-        const chunkSize = 5 * 1024 * 1024; // 5 MB chunks
-        const numParts = Math.ceil(fileBuffer.length / chunkSize);
-        const uploadPromises = [];
+            const s3Client = new S3Client({
+                region: REGION,
+                credentials: {
+                    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
+                    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
+                },
+            });
 
-        for (let i = 0; i < numParts; i++) {
-            const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, fileBuffer.length);
-            const partParams = {
-                ...uploadParams,
-                PartNumber: i + 1,
-                UploadId: uploadId as string,
-                Body: fileBuffer.slice(start, end),
+            const bucketParams = {
+                Bucket: S3_BUCKET,
+                Key: fileName,
+                Body: fileBuffer,
             };
 
-            uploadPromises.push(s3.uploadPart(partParams).promise());
+            await s3Client
+                .send(new PutObjectCommand(bucketParams));
+
+            return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+        } catch (error) {
+            console.error("Error during file upload:", error);
+            throw new Error("Upload failed, please try again.");
         }
-
-        const uploadedParts = await Promise.all(uploadPromises);
-        const completeParams = {
-            ...uploadParams,
-            UploadId: uploadId as string,
-            MultipartUpload: {
-                Parts: uploadedParts.map((part, index) => ({
-                    ETag: part.ETag,
-                    PartNumber: index + 1,
-                })),
-            },
-        };
-
-        await s3.completeMultipartUpload(completeParams).promise();
-
-        return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
-    } catch (error) {
-        await s3.abortMultipartUpload({ ...uploadParams, UploadId: uploadId as string }).promise();
-        console.error("Multipart upload failed:", error);
-        throw new Error("Upload failed, please try again.");
+    } else {
+        console.warn("No file provided for upload.");
+        throw new Error("No file to upload.");
     }
 }
-
