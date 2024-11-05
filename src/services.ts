@@ -147,12 +147,14 @@ export async function uploadFile(file: File) {
                 ContentType: file.type,
             };
 
+            console.log(params)
+
             const upload = s3
                 .putObject(params)
                 .on("httpUploadProgress", (evt) => {
                     console.log(`Uploading ${(evt.loaded * 100) / evt.total}%`);
                 })
-                .promise();
+                .promise().then(() => console.log("done")).catch(e => console.error(e));
 
             const res = await upload;
             
