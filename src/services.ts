@@ -121,10 +121,7 @@ export async function uploadFile(file: File) {
     const S3_BUCKET = "cmldocuments";
     const REGION = "eu-west-3";
 
-    console.log("Initializing upload...");
-
     const s3 = new AWS.S3({
-        params: { Bucket: S3_BUCKET },
         region: REGION,
         credentials: {
             accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
@@ -132,96 +129,56 @@ export async function uploadFile(file: File) {
         },
     });
 
-    if (file) {
-        try {
-            const fileContent = await file.arrayBuffer();
-            const fileBuffer = new Uint8Array(fileContent);
-            const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
+    const fileContent = await file.arrayBuffer();
+    const fileBuffer = new Uint8Array(fileContent);
+    const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
+    
+    const uploadParams = {
+        Bucket: S3_BUCKET,
+        Key: fileName,
+        ContentType: file.type,
+    };
 
-            console.log("File buffer prepared:", fileBuffer.length);
+    const multipartUpload = await s3.createMultipartUpload(uploadParams).promise();
+    const uploadId = multipartUpload.UploadId;
+    
+    try {
+        const chunkSize = 5 * 1024 * 1024; // 5 MB chunks
+        const numParts = Math.ceil(fileBuffer.length / chunkSize);
+        const uploadPromises = [];
 
-            const params = {
-                Bucket: S3_BUCKET,
-                Key: fileName,
-                Body: fileBuffer,
-                ContentType: file.type,
-                ContentLength: fileBuffer.length, // Explicitly set ContentLength
+        for (let i = 0; i < numParts; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, fileBuffer.length);
+            const partParams = {
+                ...uploadParams,
+                PartNumber: i + 1,
+                UploadId: uploadId as string,
+                Body: fileBuffer.slice(start, end),
             };
 
-            console.log(params)
-
-            const upload = s3
-                .putObject(params)
-                // .on("httpUploadProgress", (evt) => {
-                //     console.log(`Uploading ${(evt.loaded * 100) / evt.total}%`);
-                // })
-                .promise().then(() => console.log("done")).catch(e => console.error(e));
-
-            const res = await upload;
-            
-            console.log("Upload complete:", res);
-
-            if (res) {
-                return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
-            }
-        } catch (error) {
-            console.error("Error during file upload:", error);
-            throw new Error("Upload failed, please try again.");
+            uploadPromises.push(s3.uploadPart(partParams).promise());
         }
-    } else {
-        console.warn("No file provided for upload.");
-        throw new Error("No file to upload.");
+
+        const uploadedParts = await Promise.all(uploadPromises);
+        const completeParams = {
+            ...uploadParams,
+            UploadId: uploadId as string,
+            MultipartUpload: {
+                Parts: uploadedParts.map((part, index) => ({
+                    ETag: part.ETag,
+                    PartNumber: index + 1,
+                })),
+            },
+        };
+
+        await s3.completeMultipartUpload(completeParams).promise();
+
+        return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+    } catch (error) {
+        await s3.abortMultipartUpload({ ...uploadParams, UploadId: uploadId as string }).promise();
+        console.error("Multipart upload failed:", error);
+        throw new Error("Upload failed, please try again.");
     }
 }
-// export async function getWishInfosFromUrl(url: string) {
-//     const browser = await launch();
 
-//     const page = await browser.newPage(url);
-
-//     await page.setViewportSize({ width: 400, height: 800 });
-
-//     // const html = await page.content()
-
-//     // COMMON
-//     const title = await page.evaluate(() => document.title)
-
-//     //IF AMAZON
-//     const price = await page.evaluate(() => {
-//         return (document.getElementById("items[0.base][customerVisiblePrice][amount]") as HTMLInputElement | null)?.value
-//     })
-//     const data = { title, price }
-
-//     // ELSE
-//     // const screenshot = await page.screenshot();
-//     // Deno.writeFileSync("screenshot.png", screenshot);
-//     // TODO: send screenshot to open ai
-//     // Close the browser
-//     await browser.close();
-
-//     return data
-// }
-
-// export async function getWishInfosFromScreenshot(url: string) {
-//     const completion = await openai.chat.completions.create({
-//         model: "gpt-4o-mini",
-//         messages: [
-//             {
-//                 role: "user", content: [
-//                     {
-//                         type: "text", text: "Here is a screenshot of an ecommerce site. Give me a JSON data with two properties: the name of the item, and its price. If you can't find the item nor the price, return an empty json."
-//                     },
-//                     {
-//                         type: "image_url",
-//                         image_url: {
-//                             url
-//                             // "url": "https://image.noelshack.com/fichiers/2024/43/3/1729709559-screenamazontest.png",
-//                             // "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
-//                         },
-//                     }
-//                 ]
-//             },
-//         ],
-//     });
-
-//     return completion
-// }
