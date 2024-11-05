@@ -145,15 +145,16 @@ export async function uploadFile(file: File) {
                 Key: fileName,
                 Body: fileBuffer,
                 ContentType: file.type,
+                ContentLength: fileBuffer.length, // Explicitly set ContentLength
             };
 
             console.log(params)
 
             const upload = s3
                 .putObject(params)
-                .on("httpUploadProgress", (evt) => {
-                    console.log(`Uploading ${(evt.loaded * 100) / evt.total}%`);
-                })
+                // .on("httpUploadProgress", (evt) => {
+                //     console.log(`Uploading ${(evt.loaded * 100) / evt.total}%`);
+                // })
                 .promise().then(() => console.log("done")).catch(e => console.error(e));
 
             const res = await upload;
