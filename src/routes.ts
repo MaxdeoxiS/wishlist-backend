@@ -3,6 +3,14 @@ import { createList, createWish, deleteWish, getGroup, getList, getWish, updateW
 
 const router = new Router();
 
+router.get("/", ({ response }) => {
+    response.body = { status: "ok", message: "Wishlist API is running" };
+});
+
+router.get("/health", ({ response }) => {
+    response.body = { status: "ok" };
+});
+
 router.get("/list/:listId", async ({ params, response }) => {
     const list = await getList(params.listId)
 
