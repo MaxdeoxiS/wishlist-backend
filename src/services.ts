@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../supabase.ts";
-import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 
 
 export async function getList(id: string) {
