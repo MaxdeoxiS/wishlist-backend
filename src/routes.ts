@@ -1,5 +1,5 @@
 import { Router } from "@oak/oak/router";
-import { createList, createWish, deleteWish, getGroup, getList, getWish, updateWish, uploadFile } from "./services.ts";
+import { createList, createWish, deleteWish, getGroup, getList, getPresignedUploadUrl, getWish, updateWish, uploadFile } from "./services.ts";
 
 const router = new Router();
 
@@ -79,18 +79,43 @@ router.delete("/list/:listId/wishes/:wishId", async ({params, response}) => {
     response.body = deleted
 })
 
-router.post("/list/picture", async ({ request, response }) => {
-    const file = (await request.body.formData()).get("file") as File | null;
+router.post("/list/picture/upload-url", async ({ request, response }) => {
+    try {
+        const body = await request.body.json();
+        const filename = body?.filename || "image.jpg";
+        const contentType = body?.contentType || "image/jpeg";
 
-    if (!file) {
-        response.status = 402
-        return
+        const { uploadUrl, publicUrl } = await getPresignedUploadUrl(filename, contentType);
+
+        response.status = 200;
+        response.body = { uploadUrl, publicUrl };
+    } catch (err: any) {
+        console.error("Error generating upload URL:", err);
+        response.status = 500;
+        response.body = { error: err?.message || "Failed to generate upload URL" };
     }
+});
 
-    const fileUrl = await uploadFile(file)
+router.post("/list/picture", async ({ request, response }) => {
+    try {
+        const file = (await request.body.formData()).get("file") as File | null;
 
-    response.body = { url: fileUrl }
-})
+        if (!file) {
+            response.status = 400;
+            response.body = { error: "No file provided" };
+            return;
+        }
+
+        const fileUrl = await uploadFile(file);
+
+        response.status = 200;
+        response.body = { url: fileUrl };
+    } catch (err: any) {
+        console.error("Error uploading file in /list/picture:", err);
+        response.status = 500;
+        response.body = { error: err?.message || "Upload failed, please try again." };
+    }
+});
 
 router.get("/group/:groupId", async ({params, response}) => {
     const group = await getGroup(params.groupId)

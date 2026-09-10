@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../supabase.ts";
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 
 
 export async function getList(id: string) {
@@ -118,41 +119,62 @@ export async function deleteWish(listId: string, wishId: string) {
     return data
 }
 
+const S3_BUCKET = "cmldocuments";
+const REGION = "eu-west-3";
+
+function getS3Client() {
+    return new S3Client({
+        region: REGION,
+        credentials: {
+            accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
+            secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
+        },
+    });
+}
+
+export async function getPresignedUploadUrl(filename: string, contentType: string) {
+    const sanitized = (filename || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_").slice(-30);
+    const key = `${randomUUID()}_${sanitized}`;
+    const s3Client = getS3Client();
+
+    const command = new PutObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: key,
+        ContentType: contentType || "image/jpeg",
+    });
+
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    const publicUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+
+    return { uploadUrl, publicUrl };
+}
+
 export async function uploadFile(file: File) {
-    const S3_BUCKET = "cmldocuments";
-    const REGION = "eu-west-3";
-
-    if (file) {
-        try {
-
-            const fileContent = await file.arrayBuffer();
-            const fileBuffer = new Uint8Array(fileContent);
-            const fileName = `${randomUUID()}_${file.name.replace(" ", "-").slice(-30)}`;
-
-            const s3Client = new S3Client({
-                region: REGION,
-                credentials: {
-                    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
-                    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
-                },
-            });
-
-            const bucketParams = {
-                Bucket: S3_BUCKET,
-                Key: fileName,
-                Body: fileBuffer,
-            };
-
-            await s3Client
-                .send(new PutObjectCommand(bucketParams));
-
-            return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
-        } catch (error) {
-            console.error("Error during file upload:", error);
-            throw new Error("Upload failed, please try again.");
-        }
-    } else {
+    if (!file) {
         console.warn("No file provided for upload.");
         throw new Error("No file to upload.");
+    }
+
+    try {
+        const fileContent = await file.arrayBuffer();
+        const fileBuffer = new Uint8Array(fileContent);
+        const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, "_").slice(-30);
+        const fileName = `${randomUUID()}_${sanitized}`;
+
+        const s3Client = getS3Client();
+
+        const bucketParams = {
+            Bucket: S3_BUCKET,
+            Key: fileName,
+            Body: fileBuffer,
+            ContentType: file.type || "image/jpeg",
+        };
+
+        await s3Client.send(new PutObjectCommand(bucketParams));
+
+        return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+    } catch (error) {
+        console.error("Error during file upload:", error);
+        throw new Error("Upload failed, please try again.");
     }
 }
