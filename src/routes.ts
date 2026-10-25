@@ -11,6 +11,7 @@ import {
     getWish,
     removeListFromGroup,
     updateGroup,
+    updateList,
     updateWish,
     uploadFile
 } from "./services.ts";
@@ -55,6 +56,35 @@ router.post("/list", async ({ request, response }) => {
     }
 
     response.body = list;
+});
+
+router.put("/list/:listId", async ({ params, request, response }) => {
+    try {
+        const { listId } = params;
+        const body = await request.body.json();
+        const { title } = body;
+
+        if (!title || typeof title !== "string" || !title.trim()) {
+            response.status = 400;
+            response.body = { error: "Le titre de la liste est obligatoire." };
+            return;
+        }
+
+        const list = await updateList(listId, { title: title.trim() });
+
+        if (!list) {
+            response.status = 404;
+            response.body = { error: "Liste introuvable." };
+            return;
+        }
+
+        response.status = 200;
+        response.body = list;
+    } catch (err: any) {
+        console.error("Error updating list:", err);
+        response.status = 500;
+        response.body = { error: err?.message || "Erreur serveur" };
+    }
 });
 
 router.post("/list/:listId/wishes", async ({ request, response, params }) => {

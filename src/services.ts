@@ -63,6 +63,19 @@ export async function updateGroup(id: string, { title }: { title: string }) {
     return data;
 }
 
+export async function updateList(id: string, { title }: { title: string }) {
+    const { data, error } = await supabase.from("list").update({
+        title,
+    }).eq("id", id).select("*").single();
+
+    if (error) {
+        console.error("updateList error:", error);
+        return null;
+    }
+
+    return data;
+}
+
 export function parseListId(input: string): string {
     const trimmed = input.trim();
     const match = trimmed.match(/\/list\/([a-zA-Z0-9_-]+)/);
