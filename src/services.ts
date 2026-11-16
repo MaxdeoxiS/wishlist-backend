@@ -158,6 +158,36 @@ export async function createList({ title, user, groupId }: { title: string; user
     return data;
 }
 
+export async function deleteList(id: string) {
+    const { error: wishesError } = await supabase
+        .from("wishes")
+        .delete()
+        .eq("listId", id);
+
+    if (wishesError) {
+        console.error("deleteList wishes error:", wishesError);
+        return { error: wishesError.message };
+    }
+
+    const { data, error } = await supabase
+        .from("list")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+
+    if (error) {
+        console.error("deleteList error:", error);
+        return { error: error.message };
+    }
+
+    if (!data) {
+        return { notFound: true };
+    }
+
+    return { data };
+}
+
 export async function createWish({ url, name, price, comment, listId, picture }: { url?: string, name: string, price: number, comment?: string, listId: string, picture?: string }) {
     const { data, error } = await supabase.from("wishes").insert({
         url,

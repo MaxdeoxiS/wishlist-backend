@@ -4,6 +4,7 @@ import {
     createGroup,
     createList,
     createWish,
+    deleteList,
     deleteWish,
     getGroup,
     getList,
@@ -82,6 +83,32 @@ router.put("/list/:listId", async ({ params, request, response }) => {
         response.body = list;
     } catch (err: any) {
         console.error("Error updating list:", err);
+        response.status = 500;
+        response.body = { error: err?.message || "Erreur serveur" };
+    }
+});
+
+router.delete("/list/:listId", async ({ params, response }) => {
+    try {
+        const { listId } = params;
+        const result = await deleteList(listId);
+
+        if (result.notFound) {
+            response.status = 404;
+            response.body = { error: "Liste introuvable." };
+            return;
+        }
+
+        if (result.error) {
+            response.status = 500;
+            response.body = { error: result.error };
+            return;
+        }
+
+        response.status = 200;
+        response.body = { success: true };
+    } catch (err: any) {
+        console.error("Error deleting list:", err);
         response.status = 500;
         response.body = { error: err?.message || "Erreur serveur" };
     }
