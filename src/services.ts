@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../supabase.ts";
-import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
-import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 
 export async function getList(id: string) {
     const { data, error } = await supabase.from("list").select("*, wishes(*)").order(
@@ -21,13 +19,18 @@ export async function getList(id: string) {
 }
 
 export async function getGroup(id: string) {
-    const { data, error } = await supabase.from("group").select("*, list(*, wishes(*))").order(
-        "created_at",
-        {
-            referencedTable: "list",
-            ascending: false,
-        },
-    ).eq("id", id).maybeSingle();
+    const { data, error } = await supabase
+        .from("group")
+        .select("id, title, created_at, list(id, title, user, created_at, groupId, wishes(id, bought_by))")
+        .order(
+            "created_at",
+            {
+                referencedTable: "list",
+                ascending: false,
+            },
+        )
+        .eq("id", id)
+        .maybeSingle();
 
     if (error) {
         console.error(error)
@@ -88,39 +91,24 @@ export function parseListId(input: string): string {
 export async function addListToGroup(groupId: string, rawListId: string) {
     const listId = parseListId(rawListId);
 
-    // Check group exists
-    const { data: group, error: groupErr } = await supabase
-        .from("group")
-        .select("id")
-        .eq("id", groupId)
-        .maybeSingle();
-
-    if (groupErr || !group) {
-        return { error: "Group not found" };
-    }
-
-    // Check list exists
-    const { data: list, error: listErr } = await supabase
-        .from("list")
-        .select("id, title, user, groupId")
-        .eq("id", listId)
-        .maybeSingle();
-
-    if (listErr || !list) {
-        return { error: "List not found" };
-    }
-
-    // Update list's groupId
     const { data, error } = await supabase
         .from("list")
         .update({ groupId })
         .eq("id", listId)
-        .select("*")
-        .single();
+        .select("id, title, user, created_at, groupId, wishes(id, bought_by)")
+        .maybeSingle();
 
     if (error) {
+        // Postgres FK violation when groupId does not exist
+        if (error.code === "23503") {
+            return { error: "Group not found" };
+        }
         console.error("addListToGroup error:", error);
         return { error: error.message };
+    }
+
+    if (!data) {
+        return { error: "List not found" };
     }
 
     return { data };
@@ -227,20 +215,27 @@ export async function deleteWish(listId: string, wishId: string) {
 const S3_BUCKET = "cmldocuments";
 const REGION = "eu-west-3";
 
-function getS3Client() {
-    return new S3Client({
+async function loadS3Sdk() {
+    const [{ S3Client, PutObjectCommand }, { getSignedUrl }] = await Promise.all([
+        import("npm:@aws-sdk/client-s3"),
+        import("npm:@aws-sdk/s3-request-presigner"),
+    ]);
+
+    const s3Client = new S3Client({
         region: REGION,
         credentials: {
             accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
             secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
         },
     });
+
+    return { s3Client, PutObjectCommand, getSignedUrl };
 }
 
 export async function getPresignedUploadUrl(filename: string, contentType: string) {
     const sanitized = (filename || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_").slice(-30);
     const key = `${randomUUID()}_${sanitized}`;
-    const s3Client = getS3Client();
+    const { s3Client, PutObjectCommand, getSignedUrl } = await loadS3Sdk();
 
     const command = new PutObjectCommand({
         Bucket: S3_BUCKET,
@@ -261,12 +256,13 @@ export async function uploadFile(file: File) {
     }
 
     try {
-        const fileContent = await file.arrayBuffer();
+        const [fileContent, { s3Client, PutObjectCommand }] = await Promise.all([
+            file.arrayBuffer(),
+            loadS3Sdk(),
+        ]);
         const fileBuffer = new Uint8Array(fileContent);
         const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, "_").slice(-30);
         const fileName = `${randomUUID()}_${sanitized}`;
-
-        const s3Client = getS3Client();
 
         const bucketParams = {
             Bucket: S3_BUCKET,
